@@ -3,9 +3,13 @@
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
+#include <math.h>
 
 const int HEIGHT = 1000, WIDTH = 1000, DEPTH = 1000; // dimensions
 const int DIST = 200; // manhattan distance
+const double PI = acos(-1); 
+
+double rad(double ang){return ang*PI/180.0;}
 
 struct Point{
     double x,y,z;
@@ -20,6 +24,52 @@ struct Point{
         projected.z = z / proportion;
         return projected;
     }
+    void operator +=(const Point & ot){
+        x += ot.x;
+        y += ot.y;
+        z += ot.z;
+    }
+
+    // angles given in degrees
+    Point rotate(double angx,double angy, double angz, Point center = Point(0,0,0)){
+        double sinx = sin(rad(angx));
+        double cosx = cos(rad(angx));
+
+        double siny = sin(rad(angy));
+        double cosy = cos(rad(angy));
+
+        double sinz = sin(rad(angz));
+        double cosz = cos(rad(angz));
+        
+        return rotate(sinx,cosx,siny,cosy,sinz,cosz,center);
+    }
+    // passes the trigonometric functions, useful when you don't want to calculate these functions every rotation
+    Point rotate(double sinx, double cosx, double siny, double cosy, double sinz, double cosz, Point center = Point(0,0,0)){
+        Point pt(x-center.x,y-center.y,z-center.z);
+        Point aux = pt;
+
+        // axis x
+        pt.y = aux.y*cosx - aux.z*sinx;
+        pt.z = aux.y*sinx + aux.z*cosx;
+        aux = pt;
+
+        // axis y
+        pt.z = aux.z*cosy - aux.x*siny;
+        pt.x = aux.z*siny + aux.x*cosy;
+        aux = pt;
+
+        // axis z
+        pt.x = aux.x*cosz - aux.y*sinz;
+        pt.y = aux.x*sinz + aux.y*cosz;
+
+        pt += center;
+        return pt;
+    }
+
+    friend std::ostream & operator<<(std::ostream &os, const Point &pt){
+    os << "(" << pt.x << "," << pt.y << "," << pt.z << ")";
+    return os;
+}
 };
 struct Cube{
     struct Face{
@@ -53,6 +103,7 @@ struct Cube{
     Face faces[6];
     Face projected_faces[6];
     double rotation[3] = {0,0,0};
+    Point center;
     const double rotation_value = 5;
 
     /*
@@ -76,20 +127,20 @@ struct Cube{
         faces[5] = Face(pt5,pt1,pt4,pt8);
         
         for(int j=0; j<6; j++) projected_faces[j] = faces[j].projection();
+
+        center = Point((pt1.x+pt2.x)/2.0,(pt1.y+pt4.y)/2.0,(pt1.z+pt5.z)/2.0);
     }
     
     void draw(){
         glLoadIdentity();        
-        glRotatef(rotation[0], 1, 0, 0);
-        glRotatef(rotation[1], 0, 1, 0);
-        glRotatef(rotation[2], 0, 0, 1);
-        
-        glBegin(GL_QUADS);
-        
+        // glRotatef(rotation[0], 1, 0, 0);
+        // glRotatef(rotation[1], 0, 1, 0);
+        // glRotatef(rotation[2], 0, 0, 1);
 
+        glBegin(GL_QUADS);
         // draw the cube one face at a time
         for(int i=0; i<6; i++){
-            auto & face = projected_faces[i];
+            Face & face = projected_faces[i];
             glColor3fv(face.colors);
             for(int j=0; j<4; j++) glVertex3f(face.points[j].x,face.points[j].y,face.points[j].z);
         }
@@ -98,9 +149,24 @@ struct Cube{
 
     // for each axis, the cube is rotated by rotation_value*axis_name degrees
     void rotate(double x,double y,double z){
-        rotation[0] += x*rotation_value;
-        rotation[1] += y*rotation_value;
-        rotation[2] += z*rotation_value;
+        // rotation[0] += x*rotation_value;
+        // rotation[1] += y*rotation_value;
+        // rotation[2] += z*rotation_value;
+
+        double sinx = sin(rad(rotation_value*x));
+        double cosx = cos(rad(rotation_value*x));
+
+        double siny = sin(rad(rotation_value*y));
+        double cosy = cos(rad(rotation_value*y));
+
+        double sinz = sin(rad(rotation_value*z));
+        double cosz = cos(rad(rotation_value*z));
+
+        for(int i=0; i<6; i++){
+            Face &face = faces[i];
+            for(int j=0; j<4; j++) face.points[j] = face.points[j].rotate(sinx,cosx,siny,cosy,sinz,cosz,center);
+        }
+        for(int i=0; i<6; i++) projected_faces[i] = faces[i].projection();
     }
 };
 
@@ -112,16 +178,7 @@ Cube cube(Point(DIST,DIST,DIST),Point(-DIST,DIST,DIST),Point(-DIST,-DIST,DIST),P
 void display(){
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // resets the frame
 
-    glLoadIdentity();
-
-    glBegin(GL_LINES);
-
-    glVertex3f(rand()%100/100.0, rand()%100/100.0, rand()%100/100.0);
-
-    glVertex3f(rand()%100/100.0, rand()%100/100.0, rand()%100/100.0);
-
-    glEnd();
-    // cube.draw(); // draw the cube
+    cube.draw(); // draw the cube
 
     glutSwapBuffers(); // show the cube
 }
@@ -137,8 +194,7 @@ void initialize() {
     glDepthFunc(GL_LEQUAL);
 }
 
-
-//lida com as setinhas do teclado(para rotacionar)
+// rotate the cube
 void keyboard(int key, int x, int y) {
     if (key == GLUT_KEY_UP) cube.rotate(1,0,0);
     if (key == GLUT_KEY_DOWN) cube.rotate(-1,0,0);
