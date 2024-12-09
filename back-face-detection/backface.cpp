@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <math.h>
+#include <string>
 
 const int HEIGHT = 1000, WIDTH = 1000, DEPTH = 1000; // dimensions
 const int DIST = 200; // manhattan distance
@@ -28,6 +29,20 @@ struct Point{
         x += ot.x;
         y += ot.y;
         z += ot.z;
+    }
+    Point operator +(const Point & ot){
+        return Point(x+ot.x,y+ot.y,z+ot.z);
+    }
+    Point operator -(const Point &ot){
+        return Point(x-ot.x,y-ot.y,z-ot.z);
+    }
+    // escalar product
+    int operator *(const Point &ot){
+        return x*ot.x + y*ot.y + z*ot.z;
+    }
+    // vectorial product
+    Point operator ^(const Point &ot){
+        return Point(y*ot.z - z*ot.y, z*ot.x - x*ot.z, x*ot.y - y*ot.x);
     }
 
     // angles given in degrees
@@ -91,6 +106,15 @@ struct Cube{
             for(int j=0; j<3; j++) projected.colors[j] = colors[j];
             return projected;
         }
+
+        friend std::ostream & operator<<(std::ostream &os, const Face &face){
+            for(int j=0; j<4; j++) {
+                os << face.points[j];
+                if(j != 3) os << " - ";
+            }
+            os << std::endl;
+            return os;
+        }
     };
     /*
         front face : faces[0]
@@ -117,9 +141,9 @@ struct Cube{
         // up face
         faces[1] = Face(pt5, pt6,pt2,pt1);
         // back face
-        faces[2] = Face(pt5,pt6,pt7,pt8);
+        faces[2] = Face(pt5,pt8,pt7,pt6);
         // down face
-        faces[3] = Face(pt8,pt7,pt3,pt4);
+        faces[3] = Face(pt8,pt4,pt3,pt7);
         // left face
         faces[4] = Face(pt2,pt6,pt7,pt3);
         // right face
@@ -134,18 +158,34 @@ struct Cube{
         // points are drawn in range [-1,1]
         glLoadIdentity();        
 
+        // viewer vector
+        Point viewer = Point(0,0,-700);
+
         glBegin(GL_QUADS);
         // draw the cube one face at a time
         for(int i=0; i<6; i++){
             Face & face = projected_faces[i];
-            glColor3fv(face.colors);
-            for(int j=0; j<4; j++) glVertex3f(face.points[j].x,face.points[j].y,face.points[j].z);
+            
+            Point vt1 =  face.points[1] - face.points[0];
+            Point vt2 =  face.points[3] - face.points[0];
+            Point vtn = vt1^vt2;
+
+            Point view = face.points[0] - viewer;
+
+            if(vtn*view < 0){
+                glColor3fv(face.colors);
+                for(int j=0; j<4; j++) glVertex3f(face.points[j].x,face.points[j].y,face.points[j].z);
+            }
+            
         }
         glEnd();
     }
 
     // for each axis, the cube is rotated by rotation_value*axis_name degrees
     void rotate(double x,double y,double z){
+        // rotation[0] += x*rotation_value;
+        // rotation[1] += y*rotation_value;
+        // rotation[2] += z*rotation_value;
 
         double sinx = sin(rad(rotation_value*x));
         double cosx = cos(rad(rotation_value*x));
@@ -164,6 +204,8 @@ struct Cube{
     }
 };
 
+// parece que quando voce usa o glLoadIdentity os pontos TEM que estar entre [-1,1]
+
 Cube cube(Point(DIST,DIST,DIST),Point(-DIST,DIST,DIST),Point(-DIST,-DIST,DIST),Point(DIST,-DIST,DIST),
           Point(DIST,DIST,-DIST),Point(-DIST,DIST,-DIST),Point(-DIST,-DIST,-DIST),Point(DIST,-DIST,-DIST)); // cube drawn on the window
 
@@ -178,7 +220,7 @@ void display(){
 void initialize() {
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(WIDTH, HEIGHT);
-    glutCreateWindow("Projecao Perspectiva");
+    glutCreateWindow("Back-Face Detection");
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glOrtho(-WIDTH, WIDTH, -HEIGHT,HEIGHT, -DEPTH, DEPTH);
 
