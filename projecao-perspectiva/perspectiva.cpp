@@ -18,7 +18,7 @@ struct Point{
 
     Point projection(){
         Point projected;
-        double proportion = z-DEPTH;
+        double proportion = z-DEPTH+10;
         projected.x = x / proportion;
         projected.y = y / proportion;
         projected.z = z / proportion;
